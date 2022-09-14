@@ -10,7 +10,7 @@ def main():
         keys["access_token"],
         keys["access_token_secret"],
     )
-    id_str = input("Tweet link: ").split("/")[-1]
+    id_str = input("Tweet link: ").split("/")[-1].split("?")[0]
     try:
         resp = client.retweet_then_pin(id_str)
     except limited_twit.ClientException as e:
