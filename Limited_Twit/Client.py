@@ -1,7 +1,7 @@
 __version__ = "0.0.1"
 from typing import Dict
 import requests, json
-import AuthHandler
+from . import AuthHandler
 
 
 class ClientException(Exception):
@@ -9,6 +9,8 @@ class ClientException(Exception):
 
 
 class Client:
+    """Basic client that only supports pinning and retweeting"""
+
     def __init__(
         self,
         consumer_key: str,
@@ -22,7 +24,7 @@ class Client:
         )
         self.headers = {}
         self.headers["User-Agent"] = f"Requests/{requests.__version__}"
-        self.host = "https://twitter.com/i/api/1.1/"
+        self.host = "https://twitter.com/i/api"
         self.session = requests.Session()
 
     def request(
@@ -40,12 +42,16 @@ class Client:
         except Exception as e:
             raise ClientException(f"Failed request with: {e}")
         if not 200 <= resp.status_code < 300:
-            raise ClientException(f"Failed with http code {resp.status_code}")
+            raise ClientException(f"Failed with HTTP code: {resp.status_code}")
         self.session.close()
         return json.loads(resp.text)
 
-    def pin_tweet(self, id):
+    def pin_tweet(self, id: str) -> Dict[str, str]:
         return self.request("POST", "account/pin_tweet", id=id)
 
-    def retweet(self, id):
+    def retweet(self, id: str) -> Dict[str, str]:
         return self.request("POST", f"statuses/retweet/{id}")
+
+    def retweet_then_pin(self, id: str) -> None:
+        data = self.retweet(id)
+        self.pin_tweet(data["id_str"])
