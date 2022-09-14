@@ -28,6 +28,7 @@ class Client:
         )
         self.headers = {}
         self.headers["User-Agent"] = f"Requests/{requests.__version__}"
+        self.session = requests.Session()
 
     def request(
         self, method: str, endpoint: str, id_str: str | None = None
@@ -38,7 +39,7 @@ class Client:
         if not id_str == None:
             params["id"] = id_str
         try:
-            resp = requests.request(
+            resp = self.session.request(
                 method,
                 url,
                 params=params,
@@ -49,16 +50,33 @@ class Client:
             )
         except Exception as e:
             raise ClientException(f"Failed request with: {e}")
-        if not 200 <= resp.status_code < 300:
-            raise ClientException(f"Failed with HTTP code: {resp.status_code}")
-        return json.loads(resp.text)
 
-    def pin_tweet(self, id_str: str) -> Dict[str, str]:
+        data = json.loads(resp.text)
+        if not 200 <= resp.status_code < 300:
+            err = data["errors"]
+            raise ClientException(
+                f"Failed hitting {endpoint} with HTTP code: {resp.status_code} {err}"
+            )
+
+        self.session.close()
+        return data
+
+    def pin_tweet(self, id_str: str) -> Dict[str, str | int | Dict]:
         return self.request("POST", "account/pin_tweet", id_str=id_str)
 
-    def retweet(self, id_str: str) -> Dict[str, str]:
+    def retweet(self, id_str: str) -> Dict[str, str | int | Dict]:
         return self.request("POST", f"statuses/retweet/{id_str}")
+
+    def unretweet(
+        self,
+        id_str: str,
+    ) -> Dict[str, str | int | Dict]:
+        return self.request("POST", f"statuses/unretweet/{id_str}")
 
     def retweet_then_pin(self, id_str: str) -> None:
         data = self.retweet(id_str)
-        return self.pin_tweet(data["id_str"])
+        try:
+            self.pin_tweet(data["id_str"])
+        except Exception as e:
+            self.unretweet(id_str)
+            raise e
