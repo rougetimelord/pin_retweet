@@ -1,7 +1,7 @@
 __version__ = "0.0.1"
 from typing import Dict
 import requests, json
-from . import AuthHandler
+from .AuthHandler import AuthHandler
 
 
 class ClientException(Exception):
@@ -15,43 +15,50 @@ class Client:
         self,
         consumer_key: str,
         consumer_secret: str,
-        user_key: str | None = None,
-        user_secret: str | None = None,
+        access_token: str | None = None,
+        access_token_secret: str | None = None,
         callback: str | None = None,
     ) -> None:
-        self.auth = AuthHandler(
-            consumer_key, consumer_secret, user_key, user_secret, callback
+        self.auth: AuthHandler = AuthHandler(
+            consumer_key,
+            consumer_secret,
+            access_token,
+            access_token_secret,
+            callback,
         )
         self.headers = {}
         self.headers["User-Agent"] = f"Requests/{requests.__version__}"
-        self.host = "https://twitter.com/i/api"
-        self.session = requests.Session()
 
     def request(
-        self, method: str, endpoint: str, id: str | None = None
+        self, method: str, endpoint: str, id_str: str | None = None
     ) -> Dict[str, str]:
-        url = f"{self.host}/1.1/{endpoint}.json"
+        url = f"https://api.twitter.com/1.1/{endpoint}.json"
         auth = self.auth.apply_auth()
         params = {}
-        if not id == None:
-            params["id"] = id
+        if not id_str == None:
+            params["id"] = id_str
         try:
-            resp = self.session.request(
-                method, url, params=params, headers=self.headers, auth=auth
+            resp = requests.request(
+                method,
+                url,
+                params=params,
+                data=params,
+                json=params,
+                headers=self.headers,
+                auth=auth,
             )
         except Exception as e:
             raise ClientException(f"Failed request with: {e}")
         if not 200 <= resp.status_code < 300:
             raise ClientException(f"Failed with HTTP code: {resp.status_code}")
-        self.session.close()
         return json.loads(resp.text)
 
-    def pin_tweet(self, id: str) -> Dict[str, str]:
-        return self.request("POST", "account/pin_tweet", id=id)
+    def pin_tweet(self, id_str: str) -> Dict[str, str]:
+        return self.request("POST", "account/pin_tweet", id_str=id_str)
 
-    def retweet(self, id: str) -> Dict[str, str]:
-        return self.request("POST", f"statuses/retweet/{id}")
+    def retweet(self, id_str: str) -> Dict[str, str]:
+        return self.request("POST", f"statuses/retweet/{id_str}")
 
-    def retweet_then_pin(self, id: str) -> None:
-        data = self.retweet(id)
-        self.pin_tweet(data["id_str"])
+    def retweet_then_pin(self, id_str: str) -> None:
+        data = self.retweet(id_str)
+        return self.pin_tweet(data["id_str"])
